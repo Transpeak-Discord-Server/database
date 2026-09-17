@@ -9,10 +9,11 @@ CREATE TABLE IF NOT EXISTS transpeak.user (
     watchlist TEXT,
     special_considerations TEXT,
     last_seen TIMESTAMPTZ,
+    last_message TEXT,
 
     CONSTRAINT user_pk PRIMARY KEY (id)
 );
-CREATE INDEX index_user_message_count ON transpeak.user(message_count);
+CREATE INDEX transpeak.index_user_message_count ON transpeak.user(message_count);
 
 CREATE TABLE IF NOT EXISTS transpeak.user_role (
     user_id BIGINT NOT NULL,
@@ -24,6 +25,19 @@ CREATE TABLE IF NOT EXISTS transpeak.user_role (
     ON DELETE CASCADE,
 
     CONSTRAINT user_role_pk PRIMARY KEY (user_id, role_id)
+);
+
+CREATE TABLE IF NOT EXISTS transpeak.message_count_week (
+    user_id BIGINT NOT NULL,
+    week BIGINT NOT NULL,
+    count INT NOT NULL DEFAULT 0,
+
+    CONSTRAINT count_week_user_fk FOREIGN KEY (user_id)
+    REFERENCES transpeak.user (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE,
+
+    CONSTRAINT msg_count_week_pk PRIMARY KEY (user_id, week)
 );
 
 CREATE TABLE IF NOT EXISTS transpeak.warn (
@@ -45,7 +59,7 @@ CREATE TABLE IF NOT EXISTS transpeak.warn (
 
     CONSTRAINT warn_pk PRIMARY KEY (warn_id)
 );
-CREATE INDEX warn_user ON transpeak.warn (user_id);
+CREATE INDEX transpeak.index_warn_user ON transpeak.warn (user_id);
 
 CREATE TABLE IF NOT EXISTS transpeak.ban (
     ban_id INTEGER GENERATED ALWAYS AS IDENTITY,
@@ -66,11 +80,11 @@ CREATE TABLE IF NOT EXISTS transpeak.ban (
 
     CONSTRAINT ban_pk PRIMARY KEY (ban_id)
 );
-CREATE INDEX ban_user ON transpeak.ban (user_id);
+CREATE INDEX transpeak.index_ban_user ON transpeak.ban (user_id);
 
-CREATE TYPE event_type AS ENUM ('reminder', 'staff_reminder', 'temp_ban_expiry');
+CREATE TYPE transpeak.event_type AS ENUM ('reminder', 'staff_reminder', 'temp_ban_expiry');
 
-CREATE TABLE IF NOT EXISTS event (
+CREATE TABLE IF NOT EXISTS transpeak.event (
     event_id INTEGER GENERATED ALWAYS AS IDENTITY,
     fire_time TIMESTAMPTZ NOT NULL,
     type event_type NOT NULL,
@@ -78,4 +92,8 @@ CREATE TABLE IF NOT EXISTS event (
 
     CONSTRAINT event_pk PRIMARY KEY (event_id)
 );
-CREATE INDEX event_timestamp ON event (fire_time);
+CREATE INDEX transpeak.index_event_timestamp ON transpeak.event (fire_time);
+
+CREATE TABLE IF NOT EXISTS transpeak.dm_reminders (
+
+);
