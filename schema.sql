@@ -11,8 +11,7 @@ CREATE TABLE IF NOT EXISTS transpeak.user (
 
     CONSTRAINT user_pk PRIMARY KEY (id)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_user_id ON transpeak.user (id);
-CREATE INDEX IF NOT EXISTS transpeak.index_user_message_count ON transpeak.user(message_count);
+CREATE INDEX IF NOT EXISTS index_user_message_count ON transpeak.user(message_count);
 
 CREATE TABLE IF NOT EXISTS transpeak.watchlist (
     user_id BIGINT,
@@ -25,7 +24,6 @@ CREATE TABLE IF NOT EXISTS transpeak.watchlist (
 
     CONSTRAINT watchlist_pk PRIMARY KEY (user_id)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_watchlist_user ON transpeak.watchlist(user_id);
 
 CREATE TABLE IF NOT EXISTS transpeak.special_considerations (
     user_id BIGINT,
@@ -40,14 +38,17 @@ CREATE TABLE IF NOT EXISTS transpeak.special_considerations (
 );
 
 CREATE TABLE IF NOT EXISTS transpeak.names (
-    user_id BIGINT,
-    name TEXT,
-    timestamp TIMESTAMPTZ,
+    name_occurrence_id INTEGER GENERATED ALWAYS AS IDENTITY,
+    user_id BIGINT NOT NULL,
+    name TEXT NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL,
 
     CONSTRAINT name_user_fk FOREIGN KEY (user_id)
     REFERENCES transpeak.user (id) MATCH SIMPLE
     ON UPDATE NO ACTION
-    ON DELETE CASCADE
+    ON DELETE CASCADE,
+
+    CONSTRAINT name_pk PRIMARY KEY (name_occurrence_id)
 );
 CREATE INDEX IF NOT EXISTS index_names_user ON transpeak.names (user_id);
 
@@ -75,7 +76,6 @@ CREATE TABLE IF NOT EXISTS transpeak.message_count_week (
 
     CONSTRAINT msg_count_week_pk PRIMARY KEY (user_id, week)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_msg_count_week_user ON transpeak.message_count_week (user_id);
 CREATE INDEX IF NOT EXISTS transpeak.index_msg_count_week_week ON transpeak.message_count_week (week);
 
 CREATE TABLE IF NOT EXISTS transpeak.warn (
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS transpeak.warn (
 
     CONSTRAINT warn_pk PRIMARY KEY (warn_id)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_warn_user ON transpeak.warn (user_id);
+CREATE INDEX IF NOT EXISTS index_warn_user ON transpeak.warn (user_id);
 
 CREATE TABLE IF NOT EXISTS transpeak.staff_warn (
     warn_id INTEGER GENERATED ALWAYS AS IDENTITY,
@@ -118,9 +118,13 @@ CREATE TABLE IF NOT EXISTS transpeak.staff_warn (
 
     CONSTRAINT staff_warn_pk PRIMARY KEY (warn_id)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_staff_warn_user ON transpeak.staff_warn (user_id);
+CREATE INDEX IF NOT EXISTS index_staff_warn_user ON transpeak.staff_warn (user_id);
 
-CREATE TYPE transpeak.ban_type AS ENUM ('permanent', 'temporary');
+DO $$ BEGIN
+    IF to_regtype('transpeak.ban_type') IS NULL THEN
+        CREATE TYPE transpeak.ban_type AS ENUM ('permanent', 'temporary');
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS transpeak.ban (
     ban_id INTEGER GENERATED ALWAYS AS IDENTITY,
@@ -128,7 +132,7 @@ CREATE TABLE IF NOT EXISTS transpeak.ban (
     reason TEXT NOT NULL,
     issuer_id BIGINT NOT NULL,
     ban_timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    ban_type ban_type NOT NULL DEFAULT 'permanent',
+    ban_type transpeak.ban_type NOT NULL DEFAULT 'permanent',
 
     CONSTRAINT ban_user_fk FOREIGN KEY (user_id)
     REFERENCES transpeak.user (id) MATCH SIMPLE
@@ -142,7 +146,7 @@ CREATE TABLE IF NOT EXISTS transpeak.ban (
 
     CONSTRAINT ban_pk PRIMARY KEY (ban_id)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_ban_user ON transpeak.ban (user_id);
+CREATE INDEX IF NOT EXISTS index_ban_user ON transpeak.ban (user_id);
 
 CREATE TABLE IF NOT EXISTS transpeak.optin_ban (
     user_id BIGINT,
@@ -150,19 +154,22 @@ CREATE TABLE IF NOT EXISTS transpeak.optin_ban (
 
     CONSTRAINT optin_ban_pk PRIMARY KEY (user_id, channel_id)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_optin_ban_user ON transpeak.optin_ban (user_id);
 
-CREATE TYPE transpeak.event_type AS ENUM ('reminder', 'staff_reminder', 'temp_ban_expiry');
+DO $$ BEGIN
+    IF to_regtype('transpeak.event_type') IS NULL THEN
+       CREATE TYPE transpeak.event_type AS ENUM ('reminder', 'staff_reminder', 'temp_ban_expiry');
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS transpeak.event (
     event_id INTEGER GENERATED ALWAYS AS IDENTITY,
     fire_time TIMESTAMPTZ NOT NULL,
-    type event_type NOT NULL,
+    type transpeak.event_type NOT NULL,
     data JSON NOT NULL,
 
     CONSTRAINT event_pk PRIMARY KEY (event_id)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_event_timestamp ON transpeak.event (fire_time);
+CREATE INDEX IF NOT EXISTS index_event_timestamp ON transpeak.event (fire_time);
 
 CREATE TABLE IF NOT EXISTS transpeak.bottom_pinned_messages (
     channel_id BIGINT,
@@ -170,11 +177,10 @@ CREATE TABLE IF NOT EXISTS transpeak.bottom_pinned_messages (
 
     CONSTRAINT bottom_pinned_messages_pk PRIMARY KEY (channel_id)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_bottom_pinned_messages_channel ON transpeak.bottom_pinned_messages (channel_id);
 
 CREATE TABLE IF NOT EXISTS transpeak.dm_reminders (
-    user_id INTEGER NOT NULL,
-    message_id INTEGER NOT NULL,
+    user_id BIGINT NOT NULL,
+    message_id BIGINT NOT NULL,
 
     CONSTRAINT dm_reminders_user_fk FOREIGN KEY (user_id)
     REFERENCES transpeak.user (id) MATCH SIMPLE
@@ -183,7 +189,6 @@ CREATE TABLE IF NOT EXISTS transpeak.dm_reminders (
 
     CONSTRAINT dm_reminders_pk PRIMARY KEY (user_id, message_id)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_dm_reminders_user ON transpeak.dm_reminders (user_id);
 
 CREATE TABLE IF NOT EXISTS transpeak.help (
     command TEXT,
@@ -195,7 +200,6 @@ CREATE TABLE IF NOT EXISTS transpeak.help (
 
     CONSTRAINT help_pk PRIMARY KEY (command)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_help_command ON transpeak.help (command);
 
 CREATE TABLE IF NOT EXISTS transpeak.glossary (
     word TEXT,
