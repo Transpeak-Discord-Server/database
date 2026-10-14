@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS transpeak.message_count_week (
 
     CONSTRAINT msg_count_week_pk PRIMARY KEY (user_id, week)
 );
-CREATE INDEX IF NOT EXISTS transpeak.index_msg_count_week_week ON transpeak.message_count_week (week);
+CREATE INDEX IF NOT EXISTS index_msg_count_week_week ON transpeak.message_count_week (week);
 
 CREATE TABLE IF NOT EXISTS transpeak.warn (
     warn_id INTEGER GENERATED ALWAYS AS IDENTITY,
