@@ -1,3 +1,6 @@
+-- noinspection SqlResolveForFile @ object-type/"event_type"
+-- noinspection SqlResolveForFile @ object-type/"ban_type"
+
 CREATE SCHEMA IF NOT EXISTS transpeak;
 
 CREATE TABLE IF NOT EXISTS transpeak.user (
