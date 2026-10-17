@@ -152,6 +152,11 @@ CREATE TABLE IF NOT EXISTS transpeak.optin_ban (
     user_id BIGINT,
     channel_id BIGINT,
 
+    CONSTRAINT optin_ban_user_fk FOREIGN KEY (user_id)
+    REFERENCES transpeak.user (id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION,
+
     CONSTRAINT optin_ban_pk PRIMARY KEY (user_id, channel_id)
 );
 
