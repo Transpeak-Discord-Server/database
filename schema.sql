@@ -265,6 +265,7 @@ CREATE TABLE IF NOT EXISTS transpeak.stars (
 CREATE INDEX IF NOT EXISTS index_stars_author ON transpeak.stars(author_id);
 
 CREATE TABLE IF NOT EXISTS transpeak.command_log (
+    id INTEGER GENERATED ALWAYS AS IDENTITY,
     user_id BIGINT NOT NULL,
     timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     command TEXT NOT NULL,
@@ -275,7 +276,7 @@ CREATE TABLE IF NOT EXISTS transpeak.command_log (
     ON UPDATE CASCADE
     ON DELETE CASCADE,
 
-    CONSTRAINT command_log_pk PRIMARY KEY (user_id, timestamp)
+    CONSTRAINT command_log_pk PRIMARY KEY (id)
 );
 
 CREATE TABLE IF NOT EXISTS transpeak.registration_status_log (
