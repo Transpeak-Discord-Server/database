@@ -3,6 +3,7 @@ import dataclasses
 import datetime
 import os
 from _typeshed import SupportsLenAndGetItem
+from enum import Enum
 from pathlib import Path
 from sqlite3 import Row
 # noinspection protected-member
@@ -209,6 +210,54 @@ async def migrate_user_role(lite_db: SQLite, pg_db: Postgres):
     for entry in user_role_list:
         await create_user_role_entries(lite_db, pg_db, int(entry[0]), entry[1])
 
+### transpeak.message_count_week
+
+async def create_msg_count_week_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, week: int, count: int):
+    await create_user_if_not_exists(lite_db, pg_db, user_id)
+    await pg_db.fetchone('INSERT INTO transpeak.message_count_week VALUES (?, ?, ?)', (user_id, week, count))
+
+def get_msg_count_week_list(lite_db: SQLite):
+    return lite_db.fetchall("message_count_week.db", 'SELECT * FROM msgcount_week;')
+
+async def migrate_msg_count_week(lite_db: SQLite, pg_db: Postgres):
+    msg_count_week_list = get_msg_count_week_list(lite_db)
+    for entry in msg_count_week_list:
+        await create_msg_count_week_entry(lite_db, pg_db, int(entry[0]), int(entry[1]), int(entry[2]))
+
+### transpeak.warn
+
+# transpeak.warn_type
+class WarnType(Enum):
+    Soft = 'soft'
+    Hard = 'hard'
+    Staff = 'staff'
+
+async def create_warn_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reason: str, issuer_id: int, timestamp: datetime.datetime, warn_type: WarnType):
+    await create_user_if_not_exists(lite_db, pg_db, user_id)
+    await create_user_if_not_exists(lite_db, pg_db, issuer_id)
+    warn_type_str = str(warn_type)
+    await pg_db.fetchone('INSERT INTO transpeak.warn VALUES (?, ?, ?, ?, ?)', (user_id, reason, issuer_id, timestamp, warn_type_str))
+
+def get_hard_warns(lite_db: SQLite):
+    return lite_db.fetchall("warns.db", 'SELECT * FROM warns;')
+
+def get_soft_warns(lite_db: SQLite):
+    return lite_db.fetchall("softwarns.db", 'SELECT * FROM warns;')
+
+def get_staff_warns(lite_db: SQLite):
+    return lite_db.fetchall("staffwarnings.db", 'SELECT * FROM staffwarnings;')
+
+async def migrate_warns(lite_db: SQLite, pg_db: Postgres):
+    hard_warn_list = get_hard_warns(lite_db)
+    for entry in hard_warn_list:
+        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3])), WarnType.Hard)
+    soft_warn_list = get_soft_warns(lite_db)
+    for entry in soft_warn_list:
+        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3])), WarnType.Soft)
+    staff_warn_list = get_staff_warns(lite_db)
+    for entry in staff_warn_list:
+        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3])), WarnType.Staff)
+
 sql_lite_db = SQLite()
 postgres_db = Postgres()
 
@@ -217,3 +266,4 @@ asyncio.run(migrate_vc_watch(sql_lite_db, postgres_db))
 asyncio.run(migrate_special_considerations(sql_lite_db, postgres_db))
 asyncio.run(migrate_names(sql_lite_db, postgres_db))
 asyncio.run(migrate_user_role(sql_lite_db, postgres_db))
+asyncio.run(migrate_msg_count_week(sql_lite_db, postgres_db))
