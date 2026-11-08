@@ -179,9 +179,41 @@ async def migrate_special_considerations(lite_db: SQLite, pg_db: Postgres):
     for entry in sc_list:
         await create_special_considerations_entry(lite_db, pg_db, int(entry[0]), entry[1])
 
+### transpeak.names
+
+async def create_name_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, name: str, timestamp: datetime.datetime):
+    await create_user_if_not_exists(lite_db, pg_db, user_id)
+    await pg_db.fetchone('INSERT INTO transpeak.names VALUES (?, ?, ?)', (user_id, name, timestamp))
+
+def get_name_list(lite_db: SQLite):
+    return lite_db.fetchall("names.db", "SELECT * FROM names;")
+
+async def migrate_names(lite_db: SQLite, pg_db: Postgres):
+    name_list = get_name_list(lite_db)
+    for entry in name_list:
+        await create_name_entry(lite_db, pg_db, int(entry[0]), entry[1], datetime.datetime.fromtimestamp(int(entry[2])))
+
+### transpeak.user_role
+
+async def create_user_role_entries(lite_db: SQLite, pg_db: Postgres, user_id: int, role_list: str):
+    await create_user_if_not_exists(lite_db, pg_db, user_id)
+    roles = role_list.split(',')
+    for role in roles:
+        await pg_db.fetchone('INSERT INTO transpeak.user_role VALUES (?, ?)', (user_id, int(role)))
+
+def get_user_role_list(lite_db: SQLite):
+    return lite_db.fetchall("roles.db", 'SELECT * FROM roles;')
+
+async def migrate_user_role(lite_db: SQLite, pg_db: Postgres):
+    user_role_list = get_user_role_list(lite_db)
+    for entry in user_role_list:
+        await create_user_role_entries(lite_db, pg_db, int(entry[0]), entry[1])
+
 sql_lite_db = SQLite()
 postgres_db = Postgres()
 
 asyncio.run(migrate_watchlist(sql_lite_db, postgres_db))
 asyncio.run(migrate_vc_watch(sql_lite_db, postgres_db))
 asyncio.run(migrate_special_considerations(sql_lite_db, postgres_db))
+asyncio.run(migrate_names(sql_lite_db, postgres_db))
+asyncio.run(migrate_user_role(sql_lite_db, postgres_db))
