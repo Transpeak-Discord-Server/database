@@ -58,16 +58,20 @@ class Postgres:
         return self
 
     async def fetchone(self, query: LiteralString | SQL | bytes | Composed, params: Mapping[str, Any] | Sequence[Any] | None = None) -> Row | None:
+        await self.connection.connect(self.postgres_url)
         async with self.connection.cursor() as cursor:
             await cursor.execute(query, params)
             output = await cursor.fetchone()
+        await self.connection.commit()
         await self.connection.close()
         return output
 
     async def fetchall(self, query: LiteralString | SQL | bytes | Composed, params: Mapping[str, Any] | Sequence[Any] | None = None) -> List[Row]:
+        await self.connection.connect(self.postgres_url)
         async with self.connection.cursor() as cursor:
             await cursor.execute(query, params)
             output = await cursor.fetchall()
+        await self.connection.commit()
         await self.connection.close()
         return output
 
@@ -105,7 +109,7 @@ def get_bio(lite_db: SQLite, user_id: int) -> str | None:
 
 def get_last_seen(lite_db: SQLite, user_id: int) -> datetime.datetime | None:
     last_seen = lite_db.fetchone("online.db", 'SELECT * FROM online WHERE id = ?', (str(user_id),))
-    return None if not last_seen else datetime.datetime.fromtimestamp(int(last_seen))
+    return None if not last_seen else datetime.datetime.fromtimestamp(int(last_seen[1]))
 
 async def create_user_if_not_exists(lite_db: SQLite, pg_db: Postgres, user_id: int) -> None:
 
@@ -199,6 +203,7 @@ async def migrate_names(lite_db: SQLite, pg_db: Postgres):
 async def create_user_role_entries(lite_db: SQLite, pg_db: Postgres, user_id: int, role_list: str):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
     roles = role_list.split(',')
+    if roles[0] == '' and len(roles) == 1: return
     for role in roles:
         await pg_db.fetchone('INSERT INTO transpeak.user_role VALUES (?, ?)', (user_id, int(role)))
 
@@ -235,7 +240,7 @@ class WarnType(Enum):
 async def create_warn_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reason: str, issuer_id: int, timestamp: datetime.datetime, warn_type: WarnType):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
     await create_user_if_not_exists(lite_db, pg_db, issuer_id)
-    warn_type_str = str(warn_type)
+    warn_type_str = warn_type.value
     await pg_db.fetchone('INSERT INTO transpeak.warn VALUES (?, ?, ?, ?, ?)', (user_id, reason, issuer_id, timestamp, warn_type_str))
 
 def get_hard_warns(lite_db: SQLite):
@@ -261,6 +266,7 @@ async def migrate_warns(lite_db: SQLite, pg_db: Postgres):
 sql_lite_db = SQLite()
 postgres_db = Postgres()
 
+asyncio.run(postgres_db.init())
 asyncio.run(migrate_watchlist(sql_lite_db, postgres_db))
 asyncio.run(migrate_vc_watch(sql_lite_db, postgres_db))
 asyncio.run(migrate_special_considerations(sql_lite_db, postgres_db))

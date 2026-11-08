@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS transpeak.special_considerations (
     user_id BIGINT,
     description TEXT,
 
-    CONSTRAINT watchlist_fk FOREIGN KEY (user_id)
+    CONSTRAINT special_considerations_user_fk FOREIGN KEY (user_id)
     REFERENCES transpeak.user (id) MATCH SIMPLE
     ON UPDATE CASCADE
     ON DELETE NO ACTION,
