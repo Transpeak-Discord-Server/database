@@ -1,9 +1,11 @@
+import asyncio
 import dataclasses
 import datetime
 import os
 from _typeshed import SupportsLenAndGetItem
 from pathlib import Path
 from sqlite3 import Row
+# noinspection protected-member
 from typing import Literal, Sequence, _T_co, Mapping, Any, LiteralString, List
 from typing_extensions import Buffer
 
@@ -149,3 +151,37 @@ async def migrate_watchlist(lite_db: SQLite, pg_db: Postgres):
     for entry in watchlist:
         await create_watchlist_entry(lite_db, pg_db, int(entry[0]), entry[1])
 
+### transpeak.vc_watch
+
+async def create_vc_watch_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reason: str | None = None):
+    await create_user_if_not_exists(lite_db, pg_db, user_id)
+    await pg_db.fetchone('INSERT INTO transpeak.vc_watch VALUES (?, ?)', (user_id, reason))
+
+def get_vc_watch(lite_db: SQLite):
+    return lite_db.fetchall("vcwatch.db", "SELECT * FROM vcwatch;")
+
+async def migrate_vc_watch(lite_db: SQLite, pg_db: Postgres):
+    vc_wl = get_vc_watch(lite_db)
+    for entry in vc_wl:
+        await create_vc_watch_entry(lite_db, pg_db, int(entry[0]))
+
+### transpeak.special_considerations
+
+async def create_special_considerations_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, description: str):
+    await create_user_if_not_exists(lite_db, pg_db, user_id)
+    await pg_db.fetchone('INSERT INTO transpeak.special_considerations VALUES (?, ?)', (user_id, description))
+
+def get_special_considerations(lite_db: SQLite):
+    return lite_db.fetchall("sc.db", 'SELECT * FROM sc;')
+
+async def migrate_special_considerations(lite_db: SQLite, pg_db: Postgres):
+    sc_list = get_special_considerations(lite_db)
+    for entry in sc_list:
+        await create_special_considerations_entry(lite_db, pg_db, int(entry[0]), entry[1])
+
+sql_lite_db = SQLite()
+postgres_db = Postgres()
+
+asyncio.run(migrate_watchlist(sql_lite_db, postgres_db))
+asyncio.run(migrate_vc_watch(sql_lite_db, postgres_db))
+asyncio.run(migrate_special_considerations(sql_lite_db, postgres_db))
