@@ -291,14 +291,17 @@ async def migrate_bans(lite_db: SQLite, pg_db: Postgres):
         ban_type = BanType.Temporary if entry[4] == 1 else BanType.Permanent
         await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3])), ban_type)
 
+async def run(lite_db: SQLite, pg_db: Postgres):
+    await pg_db.init()
+    await migrate_watchlist(lite_db, pg_db)
+    await migrate_vc_watch(lite_db, pg_db)
+    await migrate_special_considerations(lite_db, pg_db)
+    await migrate_names(lite_db, pg_db)
+    await migrate_user_role(lite_db, pg_db)
+    await migrate_msg_count_week(lite_db, pg_db)
+    await migrate_warns(lite_db, pg_db)
+
 sql_lite_db = SQLite()
 postgres_db = Postgres()
 
-asyncio.run(postgres_db.init())
-asyncio.run(migrate_watchlist(sql_lite_db, postgres_db))
-asyncio.run(migrate_vc_watch(sql_lite_db, postgres_db))
-asyncio.run(migrate_special_considerations(sql_lite_db, postgres_db))
-asyncio.run(migrate_names(sql_lite_db, postgres_db))
-asyncio.run(migrate_user_role(sql_lite_db, postgres_db))
-asyncio.run(migrate_msg_count_week(sql_lite_db, postgres_db))
-asyncio.run(migrate_warns(sql_lite_db, postgres_db))
+asyncio.run(run(sql_lite_db, postgres_db))
