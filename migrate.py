@@ -2,10 +2,8 @@ import asyncio
 import dataclasses
 import datetime
 import os
-from _typeshed import SupportsLenAndGetItem
 from enum import Enum
 from pathlib import Path
-# noinspection protected-member
 from typing import Literal, Sequence, Mapping, Any, LiteralString, List
 from typing_extensions import Buffer
 
@@ -31,13 +29,13 @@ class SQLite:
             exit(1)
         self.db_files_path = Path(db_files_path_env)
 
-    def fetchone(self, db_file: Path | str, query: str, params: SupportsLenAndGetItem[str | Buffer | int | float | None | Any] | Mapping[str, str | Buffer | int | float | None | Any] = ()) -> Any:
+    def fetchone(self, db_file: Path | str, query: str, params: tuple[str | Buffer | int | float | None | Any, ...] | Mapping[str, str | Buffer | int | float | None | Any] = ()) -> Any:
         connection = sqlite3.connect(self.db_files_path / db_file)
         cursor = connection.cursor()
         cursor.execute(query, params)
         return cursor.fetchone()
 
-    def fetchall(self, db_file: Path | str, query: str, params: SupportsLenAndGetItem[str | Buffer | int | float | None | Any] | Mapping[str, str | Buffer | int | float | None | Any] = ()) -> List[Any]:
+    def fetchall(self, db_file: Path | str, query: str, params: tuple[str | Buffer | int | float | None | Any, ...] | Mapping[str, str | Buffer | int | float | None | Any] = ()) -> List[Any]:
         connection = sqlite3.connect(self.db_files_path / db_file)
         cursor = connection.cursor()
         cursor.execute(query, params)
@@ -111,7 +109,7 @@ def get_bio(lite_db: SQLite, user_id: int) -> str | None:
 
 def get_last_seen(lite_db: SQLite, user_id: int) -> datetime.datetime | None:
     last_seen = lite_db.fetchone("online.db", 'SELECT * FROM online WHERE id = ?', (str(user_id),))
-    return None if not last_seen else datetime.datetime.fromtimestamp(int(last_seen[1]))
+    return None if not last_seen else datetime.datetime.fromtimestamp(int(last_seen[1]), tz=datetime.timezone.utc)
 
 async def create_user_if_not_exists(lite_db: SQLite, pg_db: Postgres, user_id: int) -> None:
 
@@ -190,7 +188,7 @@ async def migrate_special_considerations(lite_db: SQLite, pg_db: Postgres):
 
 async def create_name_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, name: str, timestamp: datetime.datetime):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
-    await pg_db.fetchone('INSERT INTO transpeak.names VALUES (%s, %s, %s)', (user_id, name, timestamp))
+    await pg_db.fetchone('INSERT INTO transpeak.names (user_id, name, timestamp) VALUES (%s, %s, %s)', (user_id, name, timestamp))
 
 def get_name_list(lite_db: SQLite):
     return lite_db.fetchall("names.db", "SELECT * FROM names;")
@@ -198,7 +196,7 @@ def get_name_list(lite_db: SQLite):
 async def migrate_names(lite_db: SQLite, pg_db: Postgres):
     name_list = get_name_list(lite_db)
     for entry in name_list:
-        await create_name_entry(lite_db, pg_db, int(entry[0]), entry[1], datetime.datetime.fromtimestamp(int(entry[2])))
+        await create_name_entry(lite_db, pg_db, int(entry[0]), entry[1], datetime.datetime.fromtimestamp(int(entry[2]), tz=datetime.timezone.utc))
 
 ### transpeak.user_role
 
@@ -243,7 +241,7 @@ async def create_warn_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reas
     await create_user_if_not_exists(lite_db, pg_db, user_id)
     await create_user_if_not_exists(lite_db, pg_db, issuer_id)
     warn_type_str = warn_type.value
-    await pg_db.fetchone('INSERT INTO transpeak.warn VALUES (%s, %s, %s, %s, %s)', (user_id, reason, issuer_id, timestamp, warn_type_str))
+    await pg_db.fetchone('INSERT INTO transpeak.warn (user_id, reason, issuer_id, warn_timestamp, warn_type) VALUES (%s, %s, %s, %s, %s)', (user_id, reason, issuer_id, timestamp, warn_type_str))
 
 def get_hard_warns(lite_db: SQLite):
     return lite_db.fetchall("warns.db", 'SELECT * FROM warns;')
@@ -257,13 +255,13 @@ def get_staff_warns(lite_db: SQLite):
 async def migrate_warns(lite_db: SQLite, pg_db: Postgres):
     hard_warn_list = get_hard_warns(lite_db)
     for entry in hard_warn_list:
-        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3])), WarnType.Hard)
+        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), WarnType.Hard)
     soft_warn_list = get_soft_warns(lite_db)
     for entry in soft_warn_list:
-        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3])), WarnType.Soft)
+        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), WarnType.Soft)
     staff_warn_list = get_staff_warns(lite_db)
     for entry in staff_warn_list:
-        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3])), WarnType.Staff)
+        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), WarnType.Staff)
 
 ### transpeak.ban
 
@@ -277,7 +275,7 @@ class BanType(Enum):
 async def create_ban_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reason: str, issuer_id: int, timestamp: datetime.datetime, ban_type: BanType):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
     await create_user_if_not_exists(lite_db, pg_db, issuer_id)
-    await pg_db.fetchone('INSERT INTO transpeak.ban VALUES (%s, %s, %s, %s, %s, %s)', (user_id, reason, issuer_id, timestamp, ban_type.value))
+    await pg_db.fetchone('INSERT INTO transpeak.ban (user_id, reason, issuer_id, ban_timestamp, ban_type) VALUES (%s, %s, %s, %s, %s)', (user_id, reason, issuer_id, timestamp, ban_type.value))
 
 def get_bans(lite_db: SQLite):
     return lite_db.fetchall('bans.db', 'SELECT * FROM bans;')
@@ -289,7 +287,7 @@ async def migrate_bans(lite_db: SQLite, pg_db: Postgres):
     ban_list = get_bans(lite_db)
     for entry in ban_list:
         ban_type = BanType.Temporary if entry[4] == 1 else BanType.Permanent
-        await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3])), ban_type)
+        await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[3], int(entry[1]), datetime.datetime.fromtimestamp(int(entry[2]), tz=datetime.timezone.utc), ban_type)
 
 async def run(lite_db: SQLite, pg_db: Postgres):
     await pg_db.init()
