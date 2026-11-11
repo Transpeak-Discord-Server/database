@@ -71,9 +71,12 @@ class Postgres:
         await self.connection.commit()
         return output
 
-    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None):
+    async def close(self):
         await self.connection.commit()
         await self.connection.close()
+
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None):
+        await self.close()
 
 ### transpeak.user
 
@@ -302,6 +305,7 @@ async def run(lite_db: SQLite, pg_db: Postgres):
     await migrate_user_role(lite_db, pg_db)
     await migrate_msg_count_week(lite_db, pg_db)
     await migrate_warns(lite_db, pg_db)
+    await pg_db.close()
 
 sql_lite_db = SQLite()
 postgres_db = Postgres()
