@@ -138,14 +138,14 @@ async def create_user_if_not_exists(lite_db: SQLite, pg_db: Postgres, user_id: i
 
     user.last_seen = get_last_seen(lite_db, user_id)
 
-    await pg_db.fetchone('INSERT INTO transpeak.user VALUES (?, ?, ?, ?, ?, ?, ?)', user)
+    await pg_db.fetchone('INSERT INTO transpeak.user VALUES (%s, %s, %s, %s, %s, %s, %s)', user)
 
 
 ### transpeak.watchlist
 
 async def create_watchlist_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, description: str):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
-    await pg_db.fetchone('INSERT INTO transpeak.watchlist VALUES (?, ?)', (user_id, description))
+    await pg_db.fetchone('INSERT INTO transpeak.watchlist VALUES (%s, %s)', (user_id, description))
 
 def get_watchlist(lite_db: SQLite):
     return lite_db.fetchall("watchlist.db", 'SELECT * FROM watchlist')
@@ -160,7 +160,7 @@ async def migrate_watchlist(lite_db: SQLite, pg_db: Postgres):
 
 async def create_vc_watch_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reason: str | None = None):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
-    await pg_db.fetchone('INSERT INTO transpeak.vc_watch VALUES (?, ?)', (user_id, reason))
+    await pg_db.fetchone('INSERT INTO transpeak.vc_watch VALUES (%s, %s)', (user_id, reason))
 
 def get_vc_watch(lite_db: SQLite):
     return lite_db.fetchall("vcwatch.db", "SELECT * FROM vcwatch;")
@@ -174,7 +174,7 @@ async def migrate_vc_watch(lite_db: SQLite, pg_db: Postgres):
 
 async def create_special_considerations_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, description: str):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
-    await pg_db.fetchone('INSERT INTO transpeak.special_considerations VALUES (?, ?)', (user_id, description))
+    await pg_db.fetchone('INSERT INTO transpeak.special_considerations VALUES (%s, %s)', (user_id, description))
 
 def get_special_considerations(lite_db: SQLite):
     return lite_db.fetchall("sc.db", 'SELECT * FROM sc;')
@@ -188,7 +188,7 @@ async def migrate_special_considerations(lite_db: SQLite, pg_db: Postgres):
 
 async def create_name_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, name: str, timestamp: datetime.datetime):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
-    await pg_db.fetchone('INSERT INTO transpeak.names VALUES (?, ?, ?)', (user_id, name, timestamp))
+    await pg_db.fetchone('INSERT INTO transpeak.names VALUES (%s, %s, %s)', (user_id, name, timestamp))
 
 def get_name_list(lite_db: SQLite):
     return lite_db.fetchall("names.db", "SELECT * FROM names;")
@@ -205,7 +205,7 @@ async def create_user_role_entries(lite_db: SQLite, pg_db: Postgres, user_id: in
     roles = role_list.split(',')
     if roles[0] == '' and len(roles) == 1: return
     for role in roles:
-        await pg_db.fetchone('INSERT INTO transpeak.user_role VALUES (?, ?)', (user_id, int(role)))
+        await pg_db.fetchone('INSERT INTO transpeak.user_role VALUES (%s, %s)', (user_id, int(role)))
 
 def get_user_role_list(lite_db: SQLite):
     return lite_db.fetchall("roles.db", 'SELECT * FROM roles;')
@@ -219,7 +219,7 @@ async def migrate_user_role(lite_db: SQLite, pg_db: Postgres):
 
 async def create_msg_count_week_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, week: int, count: int):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
-    await pg_db.fetchone('INSERT INTO transpeak.message_count_week VALUES (?, ?, ?)', (user_id, week, count))
+    await pg_db.fetchone('INSERT INTO transpeak.message_count_week VALUES (%s, %s, %s)', (user_id, week, count))
 
 def get_msg_count_week_list(lite_db: SQLite):
     return lite_db.fetchall("message_count_week.db", 'SELECT * FROM msgcount_week;')
@@ -241,7 +241,7 @@ async def create_warn_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reas
     await create_user_if_not_exists(lite_db, pg_db, user_id)
     await create_user_if_not_exists(lite_db, pg_db, issuer_id)
     warn_type_str = warn_type.value
-    await pg_db.fetchone('INSERT INTO transpeak.warn VALUES (?, ?, ?, ?, ?)', (user_id, reason, issuer_id, timestamp, warn_type_str))
+    await pg_db.fetchone('INSERT INTO transpeak.warn VALUES (%s, %s, %s, %s, %s)', (user_id, reason, issuer_id, timestamp, warn_type_str))
 
 def get_hard_warns(lite_db: SQLite):
     return lite_db.fetchall("warns.db", 'SELECT * FROM warns;')
@@ -275,7 +275,7 @@ class BanType(Enum):
 async def create_ban_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reason: str, issuer_id: int, timestamp: datetime.datetime, ban_type: BanType):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
     await create_user_if_not_exists(lite_db, pg_db, issuer_id)
-    await pg_db.fetchone('INSERT INTO transpeak.ban VALUES (?, ?, ?, ?, ?, ?)', (user_id, reason, issuer_id, timestamp, ban_type.value))
+    await pg_db.fetchone('INSERT INTO transpeak.ban VALUES (%s, %s, %s, %s, %s, %s)', (user_id, reason, issuer_id, timestamp, ban_type.value))
 
 def get_bans(lite_db: SQLite):
     return lite_db.fetchall('bans.db', 'SELECT * FROM bans;')
