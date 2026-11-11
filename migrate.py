@@ -5,9 +5,8 @@ import os
 from _typeshed import SupportsLenAndGetItem
 from enum import Enum
 from pathlib import Path
-from sqlite3 import Row
 # noinspection protected-member
-from typing import Literal, Sequence, _T_co, Mapping, Any, LiteralString, List
+from typing import Literal, Sequence, Mapping, Any, LiteralString, List
 from typing_extensions import Buffer
 
 import psycopg
@@ -15,6 +14,9 @@ import sqlite3
 
 from psycopg import AsyncConnection
 from psycopg.sql import SQL, Composed
+
+from types import TracebackType
+
 
 ### DB stuff
 
@@ -57,23 +59,23 @@ class Postgres:
         self.connection = await psycopg.AsyncConnection.connect(self.postgres_url)
         return self
 
-    async def fetchone(self, query: LiteralString | SQL | bytes | Composed, params: Mapping[str, Any] | Sequence[Any] | None = None) -> Row | None:
-        await self.connection.connect(self.postgres_url)
+    async def fetchone(self, query: LiteralString | SQL | bytes | Composed, params: Mapping[str, Any] | Sequence[Any] | None = None) -> tuple[Any, ...] | None:
         async with self.connection.cursor() as cursor:
             await cursor.execute(query, params)
             output = await cursor.fetchone()
         await self.connection.commit()
-        await self.connection.close()
         return output
 
-    async def fetchall(self, query: LiteralString | SQL | bytes | Composed, params: Mapping[str, Any] | Sequence[Any] | None = None) -> List[Row]:
-        await self.connection.connect(self.postgres_url)
+    async def fetchall(self, query: LiteralString | SQL | bytes | Composed, params: Mapping[str, Any] | Sequence[Any] | None = None) -> List[tuple[Any, ...]]:
         async with self.connection.cursor() as cursor:
             await cursor.execute(query, params)
             output = await cursor.fetchall()
         await self.connection.commit()
-        await self.connection.close()
         return output
+
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None):
+        await self.connection.commit()
+        await self.connection.close()
 
 ### transpeak.user
 
@@ -87,7 +89,7 @@ class User(Sequence):
     last_seen: datetime.datetime | None
     last_message: str | None
 
-    def __getitem__(self, index: int, /) -> _T_co:
+    def __getitem__(self, index: int, /):
         return (self.id, self.message_count, self.under_18, self.reg_banned, self.bio, self.last_seen, self.last_message)[index]
 
     def __len__(self) -> int:
@@ -113,7 +115,7 @@ def get_last_seen(lite_db: SQLite, user_id: int) -> datetime.datetime | None:
 
 async def create_user_if_not_exists(lite_db: SQLite, pg_db: Postgres, user_id: int) -> None:
 
-    user_new_db = await pg_db.fetchone('SELECT * FROM transpeak.user WHERE id = ?', (user_id,))
+    user_new_db = await pg_db.fetchone('SELECT * FROM transpeak.user WHERE id = %s', (user_id,))
 
     if user_new_db is not None:
         return
