@@ -263,6 +263,32 @@ async def migrate_warns(lite_db: SQLite, pg_db: Postgres):
     for entry in staff_warn_list:
         await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3])), WarnType.Staff)
 
+### transpeak.ban
+
+# transpeak.ban_type
+class BanType(Enum):
+    Permanent = "permanent"
+    Temporary = "temporary"
+    VC = "vc"
+    VCSoft = "vc_soft"
+
+async def create_ban_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reason: str, issuer_id: int, timestamp: datetime.datetime, ban_type: BanType):
+    await create_user_if_not_exists(lite_db, pg_db, user_id)
+    await create_user_if_not_exists(lite_db, pg_db, issuer_id)
+    await pg_db.fetchone('INSERT INTO transpeak.ban VALUES (?, ?, ?, ?, ?, ?)', (user_id, reason, issuer_id, timestamp, ban_type.value))
+
+def get_bans(lite_db: SQLite):
+    return lite_db.fetchall('bans.db', 'SELECT * FROM bans;')
+
+def get_vc_bans(lite_db: SQLite):
+    return lite_db.fetchall('vcban.db', 'SELECT * FROM vcban;')
+
+async def migrate_bans(lite_db: SQLite, pg_db: Postgres):
+    ban_list = get_bans(lite_db)
+    for entry in ban_list:
+        ban_type = BanType.Temporary if entry[4] == 1 else BanType.Permanent
+        await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3])), ban_type)
+
 sql_lite_db = SQLite()
 postgres_db = Postgres()
 
