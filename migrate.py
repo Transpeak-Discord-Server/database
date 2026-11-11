@@ -87,7 +87,7 @@ class User(Sequence):
     last_seen: datetime.datetime | None
     last_message: str | None
 
-    def __getitem__(self, index: int, /):
+    def __getitem__(self, index: int, /):  # type: ignore[override]
         return (self.id, self.message_count, self.under_18, self.reg_banned, self.bio, self.last_seen, self.last_message)[index]
 
     def __len__(self) -> int:
@@ -288,6 +288,10 @@ async def migrate_bans(lite_db: SQLite, pg_db: Postgres):
     for entry in ban_list:
         ban_type = BanType.Temporary if entry[4] == 1 else BanType.Permanent
         await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[3], int(entry[1]), datetime.datetime.fromtimestamp(int(entry[2]), tz=datetime.timezone.utc), ban_type)
+    vc_ban_list = get_vc_bans(lite_db)
+    for entry in vc_ban_list:
+        ban_type = BanType.VC if entry[4] == "False" else BanType.VCSoft
+        await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), ban_type)
 
 async def run(lite_db: SQLite, pg_db: Postgres):
     await pg_db.init()
