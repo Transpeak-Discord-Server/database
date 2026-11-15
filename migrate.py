@@ -313,7 +313,7 @@ async def run(lite_db: SQLite, pg_db: Postgres):
     await migrate_bans(lite_db, pg_db)
     await pg_db.close()
 
-sql_lite_db = SQLite()
-postgres_db = Postgres()
-
-asyncio.run(run(sql_lite_db, postgres_db))
+if __name__ == "__main__":
+    sql_lite_db = SQLite()
+    postgres_db = Postgres()
+    asyncio.run(run(sql_lite_db, postgres_db))
