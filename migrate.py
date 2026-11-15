@@ -153,7 +153,7 @@ async def create_user_if_not_exists(lite_db: SQLite, pg_db: Postgres, user_id: i
 
 async def create_watchlist_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, description: str):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
-    await pg_db.execute('INSERT INTO transpeak.watchlist VALUES (%s, %s)', (user_id, description))
+    await pg_db.execute('INSERT INTO transpeak.watchlist VALUES (%s, %s) ON CONFLICT (user_id) DO NOTHING', (user_id, description))
 
 def get_watchlist(lite_db: SQLite):
     return lite_db.fetchall("watchlist.db", 'SELECT * FROM watchlist')
@@ -162,13 +162,16 @@ async def migrate_watchlist(lite_db: SQLite, pg_db: Postgres):
     watchlist = get_watchlist(lite_db)
 
     for entry in watchlist:
-        await create_watchlist_entry(lite_db, pg_db, int(entry[0]), entry[1])
+        try:
+            await create_watchlist_entry(lite_db, pg_db, int(entry[0]), entry[1])
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate watchlist {entry}: {e}")
 
 ### transpeak.vc_watch
 
 async def create_vc_watch_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reason: str | None = None):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
-    await pg_db.execute('INSERT INTO transpeak.vc_watch VALUES (%s, %s)', (user_id, reason))
+    await pg_db.execute('INSERT INTO transpeak.vc_watch VALUES (%s, %s) ON CONFLICT (user_id) DO NOTHING', (user_id, reason))
 
 def get_vc_watch(lite_db: SQLite):
     return lite_db.fetchall("vcwatch.db", "SELECT * FROM vcwatch;")
@@ -176,13 +179,16 @@ def get_vc_watch(lite_db: SQLite):
 async def migrate_vc_watch(lite_db: SQLite, pg_db: Postgres):
     vc_wl = get_vc_watch(lite_db)
     for entry in vc_wl:
-        await create_vc_watch_entry(lite_db, pg_db, int(entry[0]))
+        try:
+            await create_vc_watch_entry(lite_db, pg_db, int(entry[0]))
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate vc watchlist {entry}: {e}")
 
 ### transpeak.special_considerations
 
 async def create_special_considerations_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, description: str):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
-    await pg_db.execute('INSERT INTO transpeak.special_considerations VALUES (%s, %s)', (user_id, description))
+    await pg_db.execute('INSERT INTO transpeak.special_considerations VALUES (%s, %s) ON CONFLICT (user_id) DO NOTHING', (user_id, description))
 
 def get_special_considerations(lite_db: SQLite):
     return lite_db.fetchall("sc.db", 'SELECT * FROM sc;')
@@ -190,13 +196,24 @@ def get_special_considerations(lite_db: SQLite):
 async def migrate_special_considerations(lite_db: SQLite, pg_db: Postgres):
     sc_list = get_special_considerations(lite_db)
     for entry in sc_list:
-        await create_special_considerations_entry(lite_db, pg_db, int(entry[0]), entry[1])
+        try:
+            await create_special_considerations_entry(lite_db, pg_db, int(entry[0]), entry[1])
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate special considerations {entry}: {e}")
 
 ### transpeak.names
 
 async def create_name_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, name: str, timestamp: datetime.datetime):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
-    await pg_db.execute('INSERT INTO transpeak.names (user_id, name, timestamp) VALUES (%s, %s, %s)', (user_id, name, timestamp))
+    await pg_db.execute('''
+                        INSERT INTO transpeak.names (user_id, name, timestamp) 
+                        SELECT %s, %s, %s
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM transpeak.names
+                            WHERE user_id = %s AND name = %s AND timestamp = %s
+                        )
+                        ''',
+                        (user_id, name, timestamp, user_id, name, timestamp))
 
 def get_name_list(lite_db: SQLite):
     return lite_db.fetchall("names.db", "SELECT * FROM names;")
@@ -204,7 +221,10 @@ def get_name_list(lite_db: SQLite):
 async def migrate_names(lite_db: SQLite, pg_db: Postgres):
     name_list = get_name_list(lite_db)
     for entry in name_list:
-        await create_name_entry(lite_db, pg_db, int(entry[0]), entry[1], datetime.datetime.fromtimestamp(int(entry[2]), tz=datetime.timezone.utc))
+        try:
+            await create_name_entry(lite_db, pg_db, int(entry[0]), entry[1], datetime.datetime.fromtimestamp(int(entry[2]), tz=datetime.timezone.utc))
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate names entry {entry}: {e}")
 
 ### transpeak.user_role
 
@@ -213,7 +233,7 @@ async def create_user_role_entries(lite_db: SQLite, pg_db: Postgres, user_id: in
     roles = role_list.split(',')
     if roles[0] == '' and len(roles) == 1: return
     for role in roles:
-        await pg_db.execute('INSERT INTO transpeak.user_role VALUES (%s, %s)', (user_id, int(role)))
+        await pg_db.execute('INSERT INTO transpeak.user_role VALUES (%s, %s) ON CONFLICT (user_id, role_id) DO NOTHING', (user_id, int(role)))
 
 def get_user_role_list(lite_db: SQLite):
     return lite_db.fetchall("roles.db", 'SELECT * FROM roles;')
@@ -221,13 +241,16 @@ def get_user_role_list(lite_db: SQLite):
 async def migrate_user_role(lite_db: SQLite, pg_db: Postgres):
     user_role_list = get_user_role_list(lite_db)
     for entry in user_role_list:
-        await create_user_role_entries(lite_db, pg_db, int(entry[0]), entry[1])
+        try:
+            await create_user_role_entries(lite_db, pg_db, int(entry[0]), entry[1])
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate user_role entries {entry}: {e}")
 
 ### transpeak.message_count_week
 
 async def create_msg_count_week_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, week: int, count: int):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
-    await pg_db.execute('INSERT INTO transpeak.message_count_week VALUES (%s, %s, %s)', (user_id, week, count))
+    await pg_db.execute('INSERT INTO transpeak.message_count_week VALUES (%s, %s, %s) ON CONFLICT (user_id, week) DO NOTHING', (user_id, week, count))
 
 def get_msg_count_week_list(lite_db: SQLite):
     return lite_db.fetchall("message_count_week.db", 'SELECT * FROM msgcount_week;')
@@ -235,7 +258,10 @@ def get_msg_count_week_list(lite_db: SQLite):
 async def migrate_msg_count_week(lite_db: SQLite, pg_db: Postgres):
     msg_count_week_list = get_msg_count_week_list(lite_db)
     for entry in msg_count_week_list:
-        await create_msg_count_week_entry(lite_db, pg_db, int(entry[0]), int(entry[1]), int(entry[2]))
+        try:
+            await create_msg_count_week_entry(lite_db, pg_db, int(entry[0]), int(entry[1]), int(entry[2]))
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate msg_count_week entry {entry}: {e}")
 
 ### transpeak.warn
 
@@ -249,7 +275,17 @@ async def create_warn_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reas
     await create_user_if_not_exists(lite_db, pg_db, user_id)
     await create_user_if_not_exists(lite_db, pg_db, issuer_id)
     warn_type_str = warn_type.value
-    await pg_db.execute('INSERT INTO transpeak.warn (user_id, reason, issuer_id, warn_timestamp, warn_type) VALUES (%s, %s, %s, %s, %s)', (user_id, reason, issuer_id, timestamp, warn_type_str))
+    await pg_db.execute(
+        '''
+        INSERT INTO transpeak.warn (user_id, reason, issuer_id, warn_timestamp, warn_type) 
+        SELECT %s, %s, %s, %s, %s::transpeak.warn_type
+        WHERE NOT EXISTS (
+            SELECT 1 FROM transpeak.warn
+            WHERE user_id = %s AND warn_timestamp = %s AND warn_type = %s::transpeak.warn_type AND issuer_id = %s
+        )
+        ''',
+        (user_id, reason, issuer_id, timestamp, warn_type_str, user_id, timestamp, warn_type_str, issuer_id)
+    )
 
 def get_hard_warns(lite_db: SQLite):
     return lite_db.fetchall("warns.db", 'SELECT * FROM warns;')
@@ -263,13 +299,22 @@ def get_staff_warns(lite_db: SQLite):
 async def migrate_warns(lite_db: SQLite, pg_db: Postgres):
     hard_warn_list = get_hard_warns(lite_db)
     for entry in hard_warn_list:
-        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), WarnType.Hard)
+        try:
+            await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), WarnType.Hard)
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate hard warn {entry}: {e}")
     soft_warn_list = get_soft_warns(lite_db)
     for entry in soft_warn_list:
-        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), WarnType.Soft)
+        try:
+            await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), WarnType.Soft)
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate soft warn {entry}: {e}")
     staff_warn_list = get_staff_warns(lite_db)
     for entry in staff_warn_list:
-        await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), WarnType.Staff)
+        try:
+            await create_warn_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), WarnType.Staff)
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate staff warn {entry}: {e}")
 
 ### transpeak.ban
 
@@ -283,7 +328,15 @@ class BanType(Enum):
 async def create_ban_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, reason: str, issuer_id: int, timestamp: datetime.datetime, ban_type: BanType):
     await create_user_if_not_exists(lite_db, pg_db, user_id)
     await create_user_if_not_exists(lite_db, pg_db, issuer_id)
-    await pg_db.execute('INSERT INTO transpeak.ban (user_id, reason, issuer_id, ban_timestamp, ban_type) VALUES (%s, %s, %s, %s, %s)', (user_id, reason, issuer_id, timestamp, ban_type.value))
+    await pg_db.execute('''
+                        INSERT INTO transpeak.ban (user_id, reason, issuer_id, ban_timestamp, ban_type) 
+                        SELECT %s, %s, %s, %s, %s::transpeak.ban_type
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM transpeak.ban
+                            WHERE user_id = %s AND issuer_id = %s AND ban_timestamp = %s AND ban_type = %s::transpeak.ban_type
+                        )
+                        ''',
+                        (user_id, reason, issuer_id, timestamp, ban_type.value, user_id, issuer_id, timestamp, ban_type.value))
 
 def get_bans(lite_db: SQLite):
     return lite_db.fetchall('bans.db', 'SELECT * FROM bans;')
@@ -295,11 +348,17 @@ async def migrate_bans(lite_db: SQLite, pg_db: Postgres):
     ban_list = get_bans(lite_db)
     for entry in ban_list:
         ban_type = BanType.Temporary if entry[4] == 1 else BanType.Permanent
-        await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[3], int(entry[1]), datetime.datetime.fromtimestamp(int(entry[2]), tz=datetime.timezone.utc), ban_type)
+        try:
+            await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[3], int(entry[1]), datetime.datetime.fromtimestamp(int(entry[2]), tz=datetime.timezone.utc), ban_type)
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate ban {entry}: {e}")
     vc_ban_list = get_vc_bans(lite_db)
     for entry in vc_ban_list:
         ban_type = BanType.VC if entry[4] == "False" else BanType.VCSoft
-        await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), ban_type)
+        try:
+            await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[1], int(entry[2]), datetime.datetime.fromtimestamp(int(entry[3]), tz=datetime.timezone.utc), ban_type)
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate vc ban {entry}: {e}")
 
 async def run(lite_db: SQLite, pg_db: Postgres):
     await pg_db.init()
