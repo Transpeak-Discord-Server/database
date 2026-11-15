@@ -310,6 +310,7 @@ async def run(lite_db: SQLite, pg_db: Postgres):
     await migrate_user_role(lite_db, pg_db)
     await migrate_msg_count_week(lite_db, pg_db)
     await migrate_warns(lite_db, pg_db)
+    await migrate_bans(lite_db, pg_db)
     await pg_db.close()
 
 sql_lite_db = SQLite()
