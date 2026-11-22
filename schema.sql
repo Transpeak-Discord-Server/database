@@ -153,14 +153,14 @@ CREATE INDEX IF NOT EXISTS index_ban_user ON transpeak.ban (user_id);
 
 CREATE TABLE IF NOT EXISTS transpeak.optin_ban (
     user_id BIGINT,
-    channel_id BIGINT,
+    channel_name TEXT,
 
     CONSTRAINT optin_ban_user_fk FOREIGN KEY (user_id)
     REFERENCES transpeak.user (id) MATCH SIMPLE
     ON UPDATE CASCADE
     ON DELETE NO ACTION,
 
-    CONSTRAINT optin_ban_pk PRIMARY KEY (user_id, channel_id)
+    CONSTRAINT optin_ban_pk PRIMARY KEY (user_id, channel_name)
 );
 
 CREATE TABLE IF NOT EXISTS transpeak.image_restricted (
