@@ -151,6 +151,7 @@ async def create_user_if_not_exists(lite_db: SQLite, pg_db: Postgres, user_id: i
     await pg_db.execute('INSERT INTO transpeak.user VALUES (%s, %s, %s, %s, %s, %s, %s)', user)
 
 
+
 ### transpeak.watchlist
 
 async def create_watchlist_entry(lite_db: SQLite, pg_db: Postgres, user_id: int, description: str):
@@ -351,7 +352,7 @@ async def migrate_bans(lite_db: SQLite, pg_db: Postgres):
     for entry in ban_list:
         ban_type = BanType.Temporary if entry[4] == 1 else BanType.Permanent
         try:
-            await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[3], int(entry[1]), datetime.datetime.fromtimestamp(int(entry[2]), tz=datetime.timezone.utc), ban_type)
+            await create_ban_entry(lite_db, pg_db, int(entry[0]), entry[3], int(entry[1]), datetime.datetime.fromtimestamp(int(entry[2]) / 1000, tz=datetime.timezone.utc), ban_type)
         except Exception as e:
             print(f"[ERROR] Failed to migrate ban {entry}: {e}")
     vc_ban_list = get_vc_bans(lite_db)
